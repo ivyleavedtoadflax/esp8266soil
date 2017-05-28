@@ -2,21 +2,27 @@
 #include <PubSubClient.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
 
 // Update these with values suitable for your network.
 
 const char* ssid = "";
 const char* password = "";
-const char* mqtt_server = "192.168.1.177";
+const char* mqtt_server = "";
 const char* mqtt_user = "";
 const char* mqtt_password = "";
 
 #define NTP_OFFSET   60 * 60      // In seconds
 #define NTP_INTERVAL 60 * 1000    // In miliseconds
 #define NTP_ADDRESS  "europe.pool.ntp.org"
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
+// ADC stuff
+
+Adafruit_ADS1015 ads1015;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -78,6 +84,7 @@ void setup() {
   timeClient.begin();
   setup_wifi();
   client.setServer(mqtt_server, 1883);
+  ads1015.begin();
 }
 
 void loop() {
@@ -91,17 +98,34 @@ void loop() {
 
   unsigned long currentMillis = millis();
 
+  int16_t adc0, adc1, adc2;
+
     if (currentMillis - previousMillis >= interval) {
       // save the last time you blinked the LED
       previousMillis = currentMillis;
 
-      sensorValue = analogRead(sensorPin); // read the value from the sensor
+      adc0 = ads1015.readADC_SingleEnded(0);
+      adc1 = ads1015.readADC_SingleEnded(1);
+      adc2 = ads1015.readADC_SingleEnded(2);
+      //adc3 = ads1015.readADC_SingleEnded(3);
 
+      // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
-      snprintf (msg, 75, " %ld", sensorValue);
+
+      snprintf (msg, 75, " %ld", adc0);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("tele/esp/soil", msg);
+      client.publish("tele/esp/soil1", msg);
+
+      snprintf (msg, 75, " %ld", adc1);
+      Serial.print(formattedTime);
+      Serial.println(msg);
+      client.publish("tele/esp/soil2", msg);
+
+      snprintf (msg, 75, " %ld", adc2);
+      Serial.print(formattedTime);
+      Serial.println(msg);
+      client.publish("tele/esp/soil3", msg);
 
   }
 }
