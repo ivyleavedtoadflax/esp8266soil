@@ -4,8 +4,10 @@
 #include <WiFiUdp.h>
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
-// Update these with values suitable for your network.
+// WiFi AP and MQTT definitions
 
 const char* ssid = "";
 const char* password = "";
@@ -13,14 +15,23 @@ const char* mqtt_server = "";
 const char* mqtt_user = "";
 const char* mqtt_password = "";
 
+// timeserver deifintions
+
 #define NTP_OFFSET   60 * 60      // In seconds
 #define NTP_INTERVAL 60 * 1000    // In miliseconds
 #define NTP_ADDRESS  "europe.pool.ntp.org"
 
+// ds18b20 definitions
+
+#define ONE_WIRE_BUS 2  // DS18B20 pin
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature DS18B20(&oneWire);
+float oldTemp;
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
-// ADC stuff
+// Adafruit ADC definitions stuff
 
 Adafruit_ADS1015 ads1015;
 
@@ -33,7 +44,7 @@ unsigned int sensorValue = 0; // variable to store the value coming from the sen
 unsigned long previousMillis = 0;        // will store last time LED was updated
 
 // constants won't change :
-const long interval = 60000;
+const long interval = 30000;
 
 void setup_wifi() {
 
@@ -109,23 +120,45 @@ void loop() {
       adc2 = ads1015.readADC_SingleEnded(2);
       //adc3 = ads1015.readADC_SingleEnded(3);
 
+      // Attempt to get data from ds1b20
+      // Keep polling the sensor until a sensible reaf
+      // is returned (maybe never if not connected!
+
+      float temp;
+
+      //do {
+      DS18B20.requestTemperatures();
+
+      temp = DS18B20.getTempCByIndex(0);
+      //} while (temp == 85.0 || temp == (-127.0));
+
+      //if (temp != oldTemp)
+      //{
+      oldTemp = temp;
+      //}
+
       // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
+
+      snprintf (msg, 75, " %d.%02d", (int)temp, (int)(temp*100)%100);
+      Serial.print(formattedTime);
+      Serial.println(msg);
+      client.publish("test/esp/temp1", msg);
 
       snprintf (msg, 75, " %ld", adc0);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("tele/esp/soil1", msg);
+      client.publish("test/esp/soil1", msg);
 
       snprintf (msg, 75, " %ld", adc1);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("tele/esp/soil2", msg);
+      client.publish("test/esp/soil2", msg);
 
       snprintf (msg, 75, " %ld", adc2);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("tele/esp/soil3", msg);
+      client.publish("test/esp/soil3", msg);
 
   }
 }
