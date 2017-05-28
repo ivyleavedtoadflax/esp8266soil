@@ -23,10 +23,10 @@ const char* mqtt_password = "";
 
 // ds18b20 definitions
 
-#define ONE_WIRE_BUS 2  // DS18B20 pin
-OneWire oneWire(ONE_WIRE_BUS);
+#define ONE_WIRE_BUS_0 16  // DS18B20 pin
+OneWire oneWire(ONE_WIRE_BUS_0);
 DallasTemperature DS18B20(&oneWire);
-float oldTemp;
+float oldTemp0;
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
@@ -39,12 +39,11 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 char msg[50]; // Message for publishing
 
-int sensorPin = A0; // select the input pin for LDR
-unsigned int sensorValue = 0; // variable to store the value coming from the sensor
-unsigned long previousMillis = 0;        // will store last time LED was updated
+// Used for calculating period
+unsigned long previousMillis = 0;
 
 // constants won't change :
-const long interval = 30000;
+const long interval = 10000;
 
 void setup_wifi() {
 
@@ -124,26 +123,26 @@ void loop() {
       // Keep polling the sensor until a sensible reaf
       // is returned (maybe never if not connected!
 
-      float temp;
+      float temp0;
 
       //do {
       DS18B20.requestTemperatures();
 
-      temp = DS18B20.getTempCByIndex(0);
-      //} while (temp == 85.0 || temp == (-127.0));
+      temp0 = DS18B20.getTempCByIndex(0);
+      } while (temp0 == 85.0 || temp0 == (-127.0));
 
-      //if (temp != oldTemp)
-      //{
-      oldTemp = temp;
-      //}
+      if (temp0 != oldTemp0)
+      {
+      oldTemp0 = temp0;
+      }
 
       // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
 
-      snprintf (msg, 75, " %d.%02d", (int)temp, (int)(temp*100)%100);
+      snprintf (msg, 75, " %d.%02d", (int)temp0, (int)(temp0*100)%100);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("test/esp/temp1", msg);
+      client.publish("test/esp/temp0", msg);
 
       snprintf (msg, 75, " %ld", adc0);
       Serial.print(formattedTime);
