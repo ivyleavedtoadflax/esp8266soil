@@ -9,7 +9,6 @@
 
 // WiFi AP and MQTT definitions
 
-
 const char* ssid = "";
 const char* password = "";
 const char* mqtt_server = "";
@@ -45,7 +44,7 @@ char msg[50]; // Message for publishing
 
 // constants won't change:
 // 30e6 is 30 seconds
-const long interval = 30e6; // 600000
+const long interval = 30e7;
 
 void setup_wifi() {
 
@@ -117,16 +116,26 @@ void setup() {
 
       float temp0;
 
-      //do {
+      // Keep trying to get the time if errors (85 or -127 are reported)
+      // But only 5 times (otherwise can get stuck in this loop)
+
+      int count = 0;
+
+      do {
+      Serial.println("Trying to get temperature reading...");
       DS18B20.requestTemperatures();
-
       temp0 = DS18B20.getTempCByIndex(0);
-      //} while (temp0 == 85.0 || temp0 == (-127.0));
+      count = count + 1;
+      Serial.print("Attempt number: ");
+      Serial.println(count);
+      delay(100);
+    } while ((temp0 == 85.0 || temp0 == (-127.0)) & count < 5);
 
-      //if (temp0 != oldTemp0)
-      //{
+      if (temp0 != oldTemp0)
+      {
+
       oldTemp0 = temp0;
-      //}
+      }
 
       // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
