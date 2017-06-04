@@ -4,8 +4,11 @@
 #include <WiFiUdp.h>
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
-// Update these with values suitable for your network.
+// WiFi AP and MQTT definitions
+
 
 const char* ssid = "";
 const char* password = "";
@@ -13,14 +16,23 @@ const char* mqtt_server = "";
 const char* mqtt_user = "";
 const char* mqtt_password = "";
 
+// timeserver deifintions
+
 #define NTP_OFFSET   60 * 60      // In seconds
 #define NTP_INTERVAL 60 * 1000    // In miliseconds
 #define NTP_ADDRESS  "europe.pool.ntp.org"
 
+// ds18b20 definitions
+
+#define ONE_WIRE_BUS_0 2  // DS18B20 pin
+OneWire oneWire(ONE_WIRE_BUS_0);
+DallasTemperature DS18B20(&oneWire);
+float oldTemp0;
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
-// ADC stuff
+// Adafruit ADC definitions stuff-
 
 Adafruit_ADS1015 ads1015;
 
@@ -28,12 +40,12 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 char msg[50]; // Message for publishing
 
-int sensorPin = A0; // select the input pin for LDR
-unsigned int sensorValue = 0; // variable to store the value coming from the sensor
-unsigned long previousMillis = 0;        // will store last time LED was updated
+// Used for calculating period
+//unsigned long previousMillis = 0;
 
-// constants won't change :
-const long interval = 60000;
+// constants won't change:
+// 30e6 is 30 seconds
+const long interval = 30e6; // 600000
 
 void setup_wifi() {
 
@@ -85,47 +97,62 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   ads1015.begin();
-}
-
-void loop() {
 
   if (!client.connected()) {
     reconnect();
   }
+
   client.loop();
 
   timeClient.update();
 
-  unsigned long currentMillis = millis();
-
   int16_t adc0, adc1, adc2;
 
-    if (currentMillis - previousMillis >= interval) {
-      // save the last time you blinked the LED
-      previousMillis = currentMillis;
-
       adc0 = ads1015.readADC_SingleEnded(0);
-      adc1 = ads1015.readADC_SingleEnded(1);
-      adc2 = ads1015.readADC_SingleEnded(2);
+      //adc1 = ads1015.readADC_SingleEnded(1);
+      //adc2 = ads1015.readADC_SingleEnded(2);
       //adc3 = ads1015.readADC_SingleEnded(3);
+
+      // Attempt to get data from ds1b20
+
+      float temp0;
+
+      //do {
+      DS18B20.requestTemperatures();
+
+      temp0 = DS18B20.getTempCByIndex(0);
+      //} while (temp0 == 85.0 || temp0 == (-127.0));
+
+      //if (temp0 != oldTemp0)
+      //{
+      oldTemp0 = temp0;
+      //}
 
       // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
 
+      snprintf (msg, 75, " %d.%02d", (int)temp0, (int)(temp0*100)%100);
+      Serial.print(formattedTime);
+      Serial.println(msg);
+      client.publish("tele/soil/pot0/temp0", msg);
+
       snprintf (msg, 75, " %ld", adc0);
       Serial.print(formattedTime);
       Serial.println(msg);
-      client.publish("tele/esp/soil1", msg);
+      client.publish("tele/soil/pot0/moisture0", msg);
 
-      snprintf (msg, 75, " %ld", adc1);
-      Serial.print(formattedTime);
-      Serial.println(msg);
-      client.publish("tele/esp/soil2", msg);
+      //snprintf (msg, 75, " %ld", adc1);
+      //Serial.print(formattedTime);
+      //Serial.println(msg);
+      //client.publish("tele/soil1/moisture", msg);
 
-      snprintf (msg, 75, " %ld", adc2);
-      Serial.print(formattedTime);
-      Serial.println(msg);
-      client.publish("tele/esp/soil3", msg);
+      //snprintf (msg, 75, " %ld", adc2);
+      //Serial.print(formattedTime);
+      //Serial.println(msg);
+      //client.publish("tele/soil2/moisture", msg);
 
-  }
+      Serial.println("Going into deep sleep");
+      ESP.deepSleep(interval); // 20e6 is 20 microseconds
 }
+
+void loop() {}
