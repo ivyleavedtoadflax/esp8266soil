@@ -1,6 +1,5 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
 #include <OneWire.h>
@@ -14,12 +13,6 @@ const char* mqtt_server = "";
 const char* mqtt_user = "";
 const char* mqtt_password = "";
 
-// timeserver deifintions
-
-#define NTP_OFFSET   60 * 60      // In seconds
-#define NTP_INTERVAL 60 * 1000    // In miliseconds
-#define NTP_ADDRESS  "europe.pool.ntp.org"
-
 // ds18b20 definitions
 
 #define ONE_WIRE_BUS_0 2  // DS18B20 pin
@@ -28,7 +21,6 @@ DallasTemperature DS18B20(&oneWire);
 float oldTemp0;
 
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -90,7 +82,6 @@ void reconnect() {
 
 void setup() {
   Serial.begin(115200);
-  timeClient.begin();
   setup_wifi();
   client.setServer(mqtt_server, 1883);
 
@@ -99,10 +90,6 @@ void setup() {
   }
 
   client.loop();
-
-  timeClient.update();
-
-  int16_t adc0, adc1, adc2;
 
       // Get reading from ADC pin
 
@@ -117,16 +104,11 @@ void setup() {
       DS18B20.requestTemperatures();
       temp0 = DS18B20.getTempCByIndex(0);
 
-      // Get time from time server
-      String formattedTime = timeClient.getFormattedTime();
-
       snprintf (msg, 75, " %d.%02d", (int)temp0, (int)(temp0*100)%100);
-      Serial.print(formattedTime);
       Serial.println(msg);
       client.publish("tele/soil/pot0/temp0", msg);
 
       snprintf (msg, 75, " %ld", adc0);
-      Serial.print(formattedTime);
       Serial.println(msg);
       client.publish("tele/soil/pot0/moisture0", msg);
 
