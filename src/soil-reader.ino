@@ -3,7 +3,6 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
-#include <Adafruit_ADS1015.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
@@ -31,13 +30,12 @@ float oldTemp0;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
-// Adafruit ADC definitions stuff-
-
-Adafruit_ADS1015 ads1015;
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 char msg[50]; // Message for publishing
+
+int sensorPin = A0; // select the input pin for soil sensor
+unsigned int adc0 = 0; // variable to store the value coming from the sensor
 
 // Used for calculating period
 //unsigned long previousMillis = 0;
@@ -95,7 +93,6 @@ void setup() {
   timeClient.begin();
   setup_wifi();
   client.setServer(mqtt_server, 1883);
-  ads1015.begin();
 
   if (!client.connected()) {
     reconnect();
@@ -107,35 +104,18 @@ void setup() {
 
   int16_t adc0, adc1, adc2;
 
-      adc0 = ads1015.readADC_SingleEnded(0);
-      //adc1 = ads1015.readADC_SingleEnded(1);
-      //adc2 = ads1015.readADC_SingleEnded(2);
-      //adc3 = ads1015.readADC_SingleEnded(3);
+      // Get reading from ADC pin
+
+      adc0 = analogRead(sensorPin); // read the value from the sensor
 
       // Attempt to get data from ds1b20
 
       float temp0;
 
-      // Keep trying to get the time if errors (85 or -127 are reported)
-      // But only 5 times (otherwise can get stuck in this loop)
-
-      int count = 0;
-
-      do {
+      //do {
       Serial.println("Trying to get temperature reading...");
       DS18B20.requestTemperatures();
       temp0 = DS18B20.getTempCByIndex(0);
-      count = count + 1;
-      Serial.print("Attempt number: ");
-      Serial.println(count);
-      delay(100);
-    } while ((temp0 == 85.0 || temp0 == (-127.0)) & count < 5);
-
-      if (temp0 != oldTemp0)
-      {
-
-      oldTemp0 = temp0;
-      }
 
       // Get time from time server
       String formattedTime = timeClient.getFormattedTime();
@@ -150,18 +130,8 @@ void setup() {
       Serial.println(msg);
       client.publish("tele/soil/pot0/moisture0", msg);
 
-      //snprintf (msg, 75, " %ld", adc1);
-      //Serial.print(formattedTime);
-      //Serial.println(msg);
-      //client.publish("tele/soil1/moisture", msg);
-
-      //snprintf (msg, 75, " %ld", adc2);
-      //Serial.print(formattedTime);
-      //Serial.println(msg);
-      //client.publish("tele/soil2/moisture", msg);
-
       Serial.println("Going into deep sleep");
-      ESP.deepSleep(interval); // 20e6 is 20 microseconds
+      ESP.deepSleep(interval);
 }
 
 void loop() {}
